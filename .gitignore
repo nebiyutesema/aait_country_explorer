@@ -1,0 +1,35 @@
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.buildlog/
+.history
+.svn/
+
+# IntelliJ related
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# The Flutter/Dart part
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+build/
+
+# Web related
+build/web
+node_modules/
+
+# Symbolica Links
+.symbolic_links/
+
+# Environment variables (Crucial for security)
+.env
