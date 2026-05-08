@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'screens/home_screen.dart'; 
 
 void main() {
   runApp(const CountryExplorerApp());
@@ -10,15 +11,14 @@ class CountryExplorerApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Country Explorer',
+      title: 'AAU Country Explorer',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
-        colorSchemeSeed: Colors.blue,
+        colorSchemeSeed: Colors.blue, 
       ),
-      home: const Scaffold(
-        body: Center(child: Text("App Initialized")),
-      ),
+      // Change the 'home' property to point to your HomeScreen
+      home: const HomeScreen(), 
     );
   }
 }
