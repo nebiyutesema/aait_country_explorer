@@ -1,128 +1,114 @@
 class Country {
-  final String name;
+  final String commonName;
+  final String officialName;
   final String flagEmoji;
   final String region;
-  final String capital;
+  final String subregion;
+  final List<String> capital;
   final int population;
-  final List<String> currencies;
-  final List<String> languages;
   final double area;
   final List<String> timezones;
+  final Map<String, String> currencies;
+  final Map<String, String> languages;
   final String alpha3Code;
 
-  Country({
-    required this.name,
+  const Country({
+    required this.commonName,
+    required this.officialName,
     required this.flagEmoji,
     required this.region,
+    required this.subregion,
     required this.capital,
     required this.population,
-    required this.currencies,
-    required this.languages,
     required this.area,
     required this.timezones,
+    required this.currencies,
+    required this.languages,
     required this.alpha3Code,
   });
 
- 
   factory Country.fromJson(Map<String, dynamic> json) {
-    // 1. Extract the common name safely
-    final nameObj = json['name'] as Map<String, dynamic>?;
-    final commonName = (nameObj?['common'] as String?) ?? 'Unknown';
-
-    
-    final emoji = (json['flag'] as String?) ?? '';
-
-    
-    final capitalList = json['capital'] as List<dynamic>?;
-    final capitalName = (capitalList != null && capitalList.isNotEmpty)
-        ? capitalList.first as String
-        : 'N/A';
-
-    
-    final List<String> currencyNames = [];
-    final currenciesMap = json['currencies'] as Map<String, dynamic>?;
-    if (currenciesMap != null) {
-      for (var value in currenciesMap.values) {
-        if (value is Map<String, dynamic>) {
-          final curName = value['name'] as String?;
-          if (curName != null) {
-            currencyNames.add(curName);
-          }
-        }
-      }
+    // Parse currencies: { "USD": { "name": "Dollar", "symbol": "$" } }
+    final Map<String, String> parsedCurrencies = {};
+    if (json['currencies'] != null) {
+      (json['currencies'] as Map<String, dynamic>).forEach((code, value) {
+        final name = (value as Map<String, dynamic>)['name'] as String? ?? code;
+        parsedCurrencies[code] = name;
+      });
     }
 
-    // 5. Extract Languages (API format is: "languages": {"eng": "English", "spa": "Spanish"})
-    final List<String> languageNames = [];
-    final languagesMap = json['languages'] as Map<String, dynamic>?;
-    if (languagesMap != null) {
-      for (var value in languagesMap.values) {
-        if (value is String) {
-          languageNames.add(value);
-        }
-      }
+    // Parse languages: { "eng": "English" }
+    final Map<String, String> parsedLanguages = {};
+    if (json['languages'] != null) {
+      (json['languages'] as Map<String, dynamic>).forEach((code, name) {
+        parsedLanguages[code] = name as String;
+      });
     }
 
     return Country(
-      name: commonName,
-      flagEmoji: emoji,
+      commonName: (json['name']?['common'] as String?) ?? 'Unknown',
+      officialName: (json['name']?['official'] as String?) ?? 'Unknown',
+      flagEmoji: (json['flag'] as String?) ?? '',
       region: (json['region'] as String?) ?? 'Unknown',
-      capital: capitalName,
-      population: (json['population'] as num?)?.toInt() ?? 0,
-      currencies: currencyNames,
-      languages: languageNames,
-      area: (json['area'] as num?)?.toDouble() ?? 0.0,
+      subregion: (json['subregion'] as String?) ?? 'Unknown',
+      capital: (json['capital'] as List<dynamic>?)
+              ?.map((e) => e as String)
+              .toList() ??
+          [],
+      population: (json['population'] as int?) ?? 0,
+      area: ((json['area'] as num?) ?? 0).toDouble(),
       timezones: (json['timezones'] as List<dynamic>?)
               ?.map((e) => e as String)
               .toList() ??
           [],
-      alpha3Code: (json['cca3'] as String?) ?? 'N/A',
+      currencies: parsedCurrencies,
+      languages: parsedLanguages,
+      alpha3Code: (json['cca3'] as String?) ?? '',
     );
   }
 
-
   Map<String, dynamic> toJson() {
     return {
-      'name': {'common': name},
+      'name': {'common': commonName, 'official': officialName},
       'flag': flagEmoji,
       'region': region,
-      'capital': [capital],
+      'subregion': subregion,
+      'capital': capital,
       'population': population,
-      'currencies': {
-        for (var cur in currencies) cur: {'name': cur}
-      },
-      'languages': {
-        for (var index = 0; index < languages.length; index++)
-          'lang$index': languages[index]
-      },
       'area': area,
       'timezones': timezones,
+      'currencies': currencies,
+      'languages': languages,
       'cca3': alpha3Code,
     };
   }
 
   Country copyWith({
-    String? name,
+    String? commonName,
+    String? officialName,
     String? flagEmoji,
     String? region,
-    String? capital,
+    String? subregion,
+    List<String>? capital,
     int? population,
-    List<String>? currencies,
-    List<String>? languages,
     double? area,
     List<String>? timezones,
+    Map<String, String>? currencies,
+    Map<String, String>? languages,
     String? alpha3Code,
   }) {
     return Country(
-      name: name ?? this.name,
+      commonName: commonName ?? this.commonName,
+      officialName: officialName ?? this.officialName,
       flagEmoji: flagEmoji ?? this.flagEmoji,
       region: region ?? this.region,
+      subregion: subregion ?? this.subregion,
       capital: capital ?? this.capital,
       population: population ?? this.population,
-      currencies: currencies ?? this.currencies,
-      languages: languages ?? this.languages,
       area: area ?? this.area,
       timezones: timezones ?? this.timezones,
+      currencies: currencies ?? this.currencies,
+      languages: languages ?? this.languages,
       alpha3Code: alpha3Code ?? this.alpha3Code,
     );
   }
