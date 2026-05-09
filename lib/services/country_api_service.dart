@@ -1,64 +1,75 @@
 import 'dart:convert';
-import 'dart:io';
-import 'dart:async';
 import 'package:http/http.dart' as http;
 import '../models/country.dart';
 import 'api_exception.dart';
 
 class CountryApiService {
-  static const String _baseUrl = 'restcountries.com';
-  final http.Client _client;
+  final String _baseUrl = 'restcountries.com';
+  final Duration _timeout = const Duration(seconds: 10);
+  final Map<String, String> _headers = const {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+  };
 
-  CountryApiService({http.Client? client}) : _client = client ?? http.Client();
-
-  /// Fetches all countries for the Home Screen
-  Future<List<Country>> fetchAllCountries() async {
-    final url = Uri.https(_baseUrl, '/v3.1/all');
-    return _performRequest(url);
-  }
-
-  /// Fetches a specific country by its alpha code for the Detail Screen
-  Future<Country> fetchCountryByCode(String code) async {
-    final url = Uri.https(_baseUrl, '/v3.1/alpha/$code');
-    final countries = await _performRequest(url);
-    if (countries.isEmpty) {
-      throw ApiException("Country not found");
-    }
-    return countries.first;
-  }
-
-  /// Core request logic with 10-second timeout
-  Future<List<Country>> _performRequest(Uri url) async {
-    try {
-      final response = await _client.get(url).timeout(
-        const Duration(seconds: 10),
-      );
-
-      final decodedData = _checkResponse(response);
-      
-      return (decodedData as List)
-          .map((json) => Country.fromJson(json))
-          .toList();
-          
-    } on SocketException {
-      throw ApiException("No Internet Connection");
-    } on TimeoutException {
-      throw ApiException("Request timed out. Please try again.");
-    } catch (e) {
-      if (e is ApiException) rethrow;
-      throw ApiException("An unexpected error occurred: $e");
-    }
-  }
-
-  /// Private method to validate HTTP status codes
-  dynamic _checkResponse(http.Response response) {
-    if (response.statusCode >= 200 && response.statusCode < 300) {
-      return json.decode(response.body);
-    } else {
+  void _checkResponse(http.Response response) {
+    if (response.statusCode != 200) {
       throw ApiException(
-        "Failed to load data", 
-        response.statusCode
+        statusCode: response.statusCode,
+        message: 'Server error: ${response.statusCode}',
       );
     }
+  }
+
+  Future<List<Country>> fetchAllCountries() async {
+    final uri = Uri.https(
+      _baseUrl,
+      '/v3.1/all',
+      {'fields': 'name,flag,region,population,cca3'},
+    );
+
+    final response = await http
+        .get(uri, headers: _headers)
+        .timeout(_timeout);
+
+    _checkResponse(response);
+
+    final List<dynamic> data = json.decode(response.body) as List<dynamic>;
+    return data
+        .map((e) => Country.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<List<Country>> searchByName(String name) async {
+    final uri = Uri.https(
+      _baseUrl,
+      '/v3.1/name/$name',
+    );
+
+    final response = await http
+        .get(uri, headers: _headers)
+        .timeout(_timeout);
+
+    _checkResponse(response);
+
+    final List<dynamic> data = json.decode(response.body) as List<dynamic>;
+    return data
+        .map((e) => Country.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<Country> fetchByCode(String code) async {
+    final uri = Uri.https(
+      _baseUrl,
+      '/v3.1/alpha/$code',
+    );
+
+    final response = await http
+        .get(uri, headers: _headers)
+        .timeout(_timeout);
+
+    _checkResponse(response);
+
+    final List<dynamic> data = json.decode(response.body) as List<dynamic>;
+    return Country.fromJson(data.first as Map<String, dynamic>);
   }
 }
