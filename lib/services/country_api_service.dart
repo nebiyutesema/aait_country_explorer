@@ -11,6 +11,20 @@ class CountryApiService {
     'Accept': 'application/json',
   };
 
+  // Cache storage
+  List<Country>? _cachedCountries;
+  DateTime? _cacheTime;
+  final Duration _cacheTTL = const Duration(minutes: 5);
+
+  // Check if cache is still valid
+  bool get _isCacheValid {
+    if (_cachedCountries == null || _cacheTime == null) return false;
+    return DateTime.now().difference(_cacheTime!) < _cacheTTL;
+  }
+
+  // Public getter to check if data is from cache
+  bool get isFromCache => _isCacheValid && _cachedCountries != null;
+
   void _checkResponse(http.Response response) {
     if (response.statusCode != 200) {
       throw ApiException(
@@ -21,6 +35,11 @@ class CountryApiService {
   }
 
   Future<List<Country>> fetchAllCountries() async {
+    // Return cache if valid
+    if (_isCacheValid) {
+      return _cachedCountries!;
+    }
+
     final uri = Uri.https(
       _baseUrl,
       '/v3.1/all',
@@ -34,9 +53,15 @@ class CountryApiService {
     _checkResponse(response);
 
     final List<dynamic> data = json.decode(response.body) as List<dynamic>;
-    return data
+    final countries = data
         .map((e) => Country.fromJson(e as Map<String, dynamic>))
         .toList();
+
+    // Save to cache
+    _cachedCountries = countries;
+    _cacheTime = DateTime.now();
+
+    return countries;
   }
 
   Future<List<Country>> searchByName(String name) async {

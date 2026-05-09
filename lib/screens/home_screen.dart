@@ -17,16 +17,29 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final CountryApiService _apiService = CountryApiService();
   late Future<List<Country>> _countriesFuture;
+  bool _isFromCache = false;
 
   @override
   void initState() {
     super.initState();
-    _countriesFuture = _apiService.fetchAllCountries();
+    _loadCountries();
+  }
+
+  void _loadCountries() {
+    _countriesFuture = _apiService.fetchAllCountries().then((countries) {
+      if (mounted) {
+        setState(() {
+          _isFromCache = _apiService.isFromCache;
+        });
+      }
+      return countries;
+    });
   }
 
   void _retry() {
     setState(() {
-      _countriesFuture = _apiService.fetchAllCountries();
+      _isFromCache = false;
+      _loadCountries();
     });
   }
 
@@ -52,6 +65,30 @@ class _HomeScreenState extends State<HomeScreen> {
         backgroundColor: Colors.blue.shade700,
         foregroundColor: Colors.white,
         actions: [
+          // Cached badge
+          if (_isFromCache)
+            Container(
+              margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.green.shade600,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.storage, size: 14, color: Colors.white),
+                  SizedBox(width: 4),
+                  Text(
+                    'Cached',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           IconButton(
             icon: const Icon(Icons.search),
             onPressed: () {
