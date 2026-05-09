@@ -1,6 +1,10 @@
+import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import '../models/country.dart';
 import '../services/country_api_service.dart';
+import '../services/api_exception.dart';
+import 'search_screen.dart';
 import 'detail_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -12,100 +16,142 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final CountryApiService _apiService = CountryApiService();
-  List<Country> _allCountries = [];
-  List<Country> _filteredCountries = [];
-  bool _isLoading = true;
-  String _errorMessage = '';
+  late Future<List<Country>> _countriesFuture;
 
   @override
   void initState() {
     super.initState();
-    _loadCountries();
+    _countriesFuture = _apiService.fetchAllCountries();
   }
 
-  Future<void> _loadCountries() async {
-    try {
-      final countries = await _apiService.fetchAllCountries();
-      setState(() {
-        _allCountries = countries;
-        _filteredCountries = countries;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _errorMessage = e.toString();
-        _isLoading = false;
-      });
-    }
-  }
-
-  void _filterCountries(String query) {
+  void _retry() {
     setState(() {
-      _filteredCountries = _allCountries
-          .where((country) =>
-              country.name.toLowerCase().contains(query.toLowerCase()))
-          .toList();
+      _countriesFuture = _apiService.fetchAllCountries();
     });
+  }
+
+  String _getErrorMessage(Object error) {
+    if (error is SocketException) {
+      return 'No internet connection. Please check your network.';
+    } else if (error is TimeoutException) {
+      return 'Request timed out. Please try again.';
+    } else if (error is ApiException) {
+      return 'Server error ${error.statusCode}: ${error.message}';
+    } else if (error is FormatException) {
+      return 'Unexpected data format received.';
+    } else {
+      return 'An unexpected error occurred: ${error.toString()}';
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("AAU Country Explorer"),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(60),
-          child: Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: TextField(
-              decoration: InputDecoration(
-                hintText: "Search country by name...",
-                prefixIcon: const Icon(Icons.search),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                filled: true,
-                fillColor: Colors.white,
-              ),
-              onChanged: _filterCountries,
-            ),
+        title: const Text('🌍 Country Explorer'),
+        backgroundColor: Colors.blue.shade700,
+        foregroundColor: Colors.white,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.search),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const SearchScreen()),
+              );
+            },
           ),
-        ),
+        ],
       ),
-      body: _buildBody(),
-    );
-  }
-
-  Widget _buildBody() {
-    if (_isLoading) return const Center(child: CircularProgressIndicator());
-    
-    if (_errorMessage.isNotEmpty) {
-      return Center(child: Text(_errorMessage, style: const TextStyle(color: Colors.red)));
-    }
-
-    if (_filteredCountries.isEmpty) {
-      return const Center(child: Text("No countries found."));
-    }
-
-    return ListView.builder(
-      itemCount: _filteredCountries.length,
-      itemBuilder: (context, index) {
-        final country = _filteredCountries[index];
-        return ListTile(
-          leading: Text(country.flagEmoji, style: const TextStyle(fontSize: 24)),
-          title: Text(country.name),
-          subtitle: Text(country.region),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => DetailScreen(countryCode: country.alpha3Code),
+      body: FutureBuilder<List<Country>>(
+        future: _countriesFuture,
+        builder: (context, snapshot) {
+          // State 1: Loading
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 16),
+                  Text('Loading countries...'),
+                ],
               ),
             );
-          },
-        );
-      },
+          }
+
+          // State 2: Error
+          if (snapshot.hasError) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.error_outline,
+                        size: 64, color: Colors.red),
+                    const SizedBox(height: 16),
+                    Text(
+                      _getErrorMessage(snapshot.error!),
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 16),
+                    ),
+                    const SizedBox(height: 24),
+                    ElevatedButton.icon(
+                      onPressed: _retry,
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Retry'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue.shade700,
+                        foregroundColor: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
+
+          // State 3: No data
+          if (!snapshot.hasData || snapshot.data!.isEmpty) {
+            return const Center(
+              child: Text('No countries found.'),
+            );
+          }
+
+          // State 4: Data
+          final countries = snapshot.data!;
+          countries.sort((a, b) => a.commonName.compareTo(b.commonName));
+
+          return ListView.builder(
+            itemCount: countries.length,
+            itemBuilder: (context, index) {
+              final country = countries[index];
+              return ListTile(
+                leading: Text(
+                  country.flagEmoji,
+                  style: const TextStyle(fontSize: 32),
+                ),
+                title: Text(
+                  country.commonName,
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                subtitle: Text(country.region),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          DetailScreen(alpha3Code: country.alpha3Code),
+                    ),
+                  );
+                },
+              );
+            },
+          );
+        },
+      ),
     );
   }
 }
